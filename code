@@ -1,0 +1,151 @@
+local animationFolder = game:GetService("ReplicatedStorage"):FindFirstChild("Animations")
+
+if not animationFolder then
+	error("Animations folder not found")
+end
+
+local walkForwardAnim = animationFolder:FindFirstChild("WalkForwardR6")
+local walkBackwardAnim = animationFolder:FindFirstChild("WalkBackwardR6")
+local walkLeftAnim = animationFolder:FindFirstChild("WalkLeftR6")
+local walkRightAnim = animationFolder:FindFirstChild("WalkRightR6")
+local walkForwardLeftAnim = animationFolder:FindFirstChild("WalkForwardLeftR6")
+local walkForwardRightAnim = animationFolder:FindFirstChild("WalkForwardRightR6")
+local walkBackwardLeftAnim = animationFolder:FindFirstChild("WalkBackwardLeftR6")
+local walkBackwardRightAnim = animationFolder:FindFirstChild("WalkBackwardRightR6")
+
+if not walkForwardAnim or not walkBackwardAnim or not walkLeftAnim or not walkRightAnim then
+	error("One or more walk animations not found")
+end
+
+local humanoid = game:GetService("Players").LocalPlayer.Character:WaitForChild("Humanoid")
+local animator = humanoid.Animator
+
+local animationControllers = {}
+
+local function playAnimation(animation)
+	local animationController = animationControllers[animation.Name]
+
+	if not animationController then
+		animationController = animator:LoadAnimation(animation)
+		animationControllers[animation.Name] = animationController
+	end
+
+	if animationController.IsPlaying then
+		return animationController
+	end
+
+	animationController:Play()
+	animationController:GetMarkerReachedSignal("End"):Connect(function()
+		animationController:Stop()
+	end)
+
+	return animationController
+end
+
+local function stopAnimation(animationController)
+	if animationController then
+		animationController:Stop()
+	end
+end
+
+local function getMoveDirection(rootPart)
+	if not rootPart then
+		return nil
+	end
+	
+	local forwardDirection = rootPart.CFrame.LookVector
+	local rightDirection = rootPart.CFrame.RightVector
+
+	local moveDirection = forwardDirection * humanoid.MoveDirection.Z + rightDirection * humanoid.MoveDirection.X
+
+	return moveDirection.Unit
+end
+
+
+local function applyMotionR6(rootPart, moveDirection)
+	if not rootPart then
+		return nil
+	end
+
+	local humanoid = rootPart.Parent:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return nil
+	end
+
+	local x = moveDirection.X
+	local z = moveDirection.Z
+
+	humanoid:Move(Vector3.new(x * 16, 0, z * 16))
+
+	if rootPart then
+		rootPart.CFrame = CFrame.new(rootPart.CFrame.Position + Vector3.new(x * 16, 0, z * 16))
+	end
+end
+
+game:GetService("RunService").Heartbeat:Connect(function()
+	local rootPart = humanoid.Parent:FindFirstChild("Torso")
+	if not rootPart then
+		return
+	end
+
+	local moveDirection = getMoveDirection(rootPart)
+	
+	if moveDirection and moveDirection.Magnitude > 0 then
+		humanoid.WalkSpeed = 16
+
+		local dotForward = moveDirection:Dot(Vector3.new(0, 0, -1))
+		local dotBackward = moveDirection:Dot(Vector3.new(0, 0, 1))
+		local dotLeft = moveDirection:Dot(Vector3.new(-1, 0, 0))
+		local dotRight = moveDirection:Dot(Vector3.new(1, 0, 0))
+
+		local currentAnimationController = nil
+
+		if dotForward > 0 then
+			if dotRight > 0 then
+				-- Forward-Right
+				print("ForwardRight")
+				playAnimation(walkForwardRightAnim)
+			elseif dotRight < 0 then
+				-- Forward-Left
+				print("ForwardLeft")
+				playAnimation(walkForwardLeftAnim)
+			else
+				-- Forward
+				print("Forward")
+				playAnimation(walkForwardAnim)
+			end
+		elseif dotForward < 0 then
+			if dotRight > 0 then
+				-- Backward-Right
+				print("BackwardRight")
+				playAnimation(walkBackwardRightAnim)
+			elseif dotRight < 0 then
+				-- Backward-Left
+				print("BackwardLeft")
+				playAnimation(walkBackwardLeftAnim)
+			else
+				-- Backward
+				print("Backward")
+				playAnimation(walkBackwardAnim)
+			end
+		else
+			if dotRight > 0 then
+				-- Right
+				print("Right")
+				playAnimation(walkRightAnim)
+			elseif dotRight < 0 then
+				-- Left
+				print("Left")
+				playAnimation(walkLeftAnim)
+			else
+				-- Idle
+				stopAnimation(playAnimation(walkForwardAnim))
+			end
+		end
+
+		applyMotionR6(humanoid.RootPart, moveDirection)
+	else
+		humanoid.WalkSpeed = 0
+		stopAnimation(playAnimation(walkForwardAnim))
+	end
+end)
